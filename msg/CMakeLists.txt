@@ -91,6 +91,7 @@ set(msg_files
 	FigureEightStatus.msg
 	FailsafeFlags.msg
 	FailureDetectorStatus.msg
+	FlightPhaseEstimation.msg
 	FollowTarget.msg
 	FollowTargetEstimator.msg
 	FollowTargetStatus.msg
