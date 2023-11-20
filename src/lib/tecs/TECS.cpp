@@ -232,7 +232,7 @@ void TECSControl::initialize(const Setpoint &setpoint, const Input &input, Param
 
 	_detectUnderspeed(input, param, flag);
 
-	const SpecificEnergyWeighting weight{_updateSpeedAltitudeWeights(param, flag)};
+	const SpecificEnergyWeighting weight{_updateSpeedAltitudeWeights(input, param, flag)};
 	ControlValues seb_rate{_calcPitchControlSebRate(weight, specific_energy_rate)};
 
 	_pitch_setpoint = _calcPitchControlOutput(input, seb_rate, param, flag);
@@ -374,18 +374,27 @@ void TECSControl::_detectUnderspeed(const Input &input, const Param &param, cons
 			   math::max(tas_starting_to_underspeed - tas_fully_undersped, FLT_EPSILON), 0.0f, 1.0f);
 }
 
-TECSControl::SpecificEnergyWeighting TECSControl::_updateSpeedAltitudeWeights(const Param &param, const Flag &flag)
+TECSControl::SpecificEnergyWeighting TECSControl::_updateSpeedAltitudeWeights(const Input &input, const Param &param,
+		const Flag &flag)
 {
 
 	SpecificEnergyWeighting weight;
 	// Calculate the weight applied to control of specific kinetic energy error
 	float pitch_speed_weight = constrain(param.pitch_speed_weight, 0.0f, 2.0f);
 
+	// if a descend was commanded and we do not hit the maximum airspeed, put all the weight on the altitude error
+	static constexpr float MAX_TAS_FAST_DESCEND_FACTOR{0.9f};
+
 	if (_ratio_undersped > FLT_EPSILON && flag.airspeed_enabled) {
 		pitch_speed_weight = 2.0f * _ratio_undersped + (1.0f - _ratio_undersped) * pitch_speed_weight;
 
 	} else if (!flag.airspeed_enabled) {
 		pitch_speed_weight = 0.0f;
+
+	} else if (flag.fast_descend) {
+		pitch_speed_weight *= math::min(math::max(input.tas - MAX_TAS_FAST_DESCEND_FACTOR * param.tas_max,
+						0.f) / ((1.f - MAX_TAS_FAST_DESCEND_FACTOR) * param.tas_max), 1.f);
+		static uint32_t cnt{0U};
 
 	}
 
@@ -398,10 +407,9 @@ TECSControl::SpecificEnergyWeighting TECSControl::_updateSpeedAltitudeWeights(co
 }
 
 void TECSControl::_calcPitchControl(float dt, const Input &input, const SpecificEnergyRates &specific_energy_rates,
-				    const Param &param,
-				    const Flag &flag)
+				    const Param &param, const Flag &flag)
 {
-	const SpecificEnergyWeighting weight{_updateSpeedAltitudeWeights(param, flag)};
+	const SpecificEnergyWeighting weight{_updateSpeedAltitudeWeights(input, param, flag)};
 	ControlValues seb_rate{_calcPitchControlSebRate(weight, specific_energy_rates)};
 
 	_calcPitchControlUpdate(dt, input, seb_rate, param);
@@ -675,11 +683,13 @@ void TECS::update(float pitch, float altitude, float hgt_setpoint, float EAS_set
 	_reference_param.target_sinkrate = target_sinkrate;
 	// Control
 	_control_param.tas_min = eas_to_tas * _equivalent_airspeed_min;
+	_control_param.tas_max = eas_to_tas * _equivalent_airspeed_max;
 	_control_param.pitch_max = pitch_limit_max;
 	_control_param.pitch_min = pitch_limit_min;
 	_control_param.throttle_trim = throttle_trim;
 	_control_param.throttle_max = throttle_setpoint_max;
 	_control_param.throttle_min = throttle_min;
+	_control_flag.fast_descend = false;
 
 	if (dt < DT_MIN) {
 		// Update intervall too small, do not update. Assume constant states/output in this case.
@@ -714,6 +724,8 @@ void TECS::update(float pitch, float altitude, float hgt_setpoint, float EAS_set
 							.tas = eas_to_tas * eas.speed,
 							.tas_rate = eas_to_tas * eas.speed_rate};
 
+		_control_flag.fast_descend = _checkFastDescend(hgt_setpoint, altitude);
+
 		_control.update(dt, control_setpoint, control_input, _control_param, _control_flag);
 
 		// Update time stamps
@@ -728,3 +740,13 @@ void TECS::update(float pitch, float altitude, float hgt_setpoint, float EAS_set
 	}
 }
 
+bool TECS::_checkFastDescend(const float alt_setpoint, const float alt)
+{
+	bool ret_val{false};
+
+	if (alt_setpoint + _fast_descend_alt_err < alt) {
+		ret_val = true;
+	}
+
+	return ret_val;
+}
