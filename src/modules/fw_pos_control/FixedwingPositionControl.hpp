@@ -394,7 +394,6 @@ private:
 
 	bool _reinitialize_tecs{true};
 	bool _tecs_is_running{false};
-	float _last_tecs_alt_sp{0.f}; //< last tecs altitude setpoint [m]
 	hrt_abstime _time_last_tecs_update{0}; // [us]
 
 	// VTOL / TRANSITION
