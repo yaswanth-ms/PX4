@@ -40,7 +40,8 @@ namespace differential_drive_control
 
 DifferentialDriveControl::DifferentialDriveControl() :
 	ModuleParams(nullptr),
-	ScheduledWorkItem(MODULE_NAME, px4::wq_configurations::rate_ctrl)
+	ScheduledWorkItem(MODULE_NAME, px4::wq_configurations::rate_ctrl),
+	_differential_guidance_controller(this)
 {
 	updateParams();
 }
@@ -59,7 +60,9 @@ void DifferentialDriveControl::updateParams()
 
 	_differential_drive_kinematics.setWheelBase(_param_rdd_wheel_base.get());
 	_differential_drive_kinematics.setMaxSpeed(_max_speed);
+	_differential_guidance_controller.setMaxSpeed(_max_speed);
 	_differential_drive_kinematics.setMaxAngularVelocity(_max_angular_velocity);
+	_differential_guidance_controller.setMaxAngularVelocity(_max_angular_velocity);
 }
 
 void DifferentialDriveControl::Run()
@@ -70,6 +73,9 @@ void DifferentialDriveControl::Run()
 	}
 
 	hrt_abstime now = hrt_absolute_time();
+
+	float dt  = math::min((now - _time_stamp_last), _timeout) / 1e6f;
+	_time_stamp_last = now;
 
 	if (_parameter_update_sub.updated()) {
 		parameter_update_s pupdate;
@@ -83,7 +89,8 @@ void DifferentialDriveControl::Run()
 
 		if (_vehicle_control_mode_sub.copy(&vehicle_control_mode)) {
 			_armed = vehicle_control_mode.flag_armed;
-			_manual_driving = vehicle_control_mode.flag_control_manual_enabled; // change this when more modes are supported
+			_manual_driving = vehicle_control_mode.flag_control_manual_enabled;
+			_mission_driving = vehicle_control_mode.flag_control_auto_enabled;
 		}
 	}
 
@@ -101,11 +108,67 @@ void DifferentialDriveControl::Run()
 				_differential_drive_setpoint_pub.publish(_differential_drive_setpoint);
 			}
 		}
+
+	} else if (_mission_driving) {
+		// Mission mode
+		// directly receive setpoints from the guidance library
+
+		// subscriptions are in here for now, because we only need them in mission mode, later if we want to use them for manual mode, we can move them out
+		if (_vehicle_attitude_sub.updated()) {
+			_vehicle_attitude_sub.copy(&_vehicle_attitude);
+		}
+
+		if (_global_pos_sub.updated()) {
+			_global_pos_sub.copy(&_global_pos);
+		}
+
+		if (_vehicle_angular_velocity_sub.updated()) {
+			_vehicle_angular_velocity_sub.copy(&_vehicle_angular_velocity);
+		}
+
+		if (_vehicle_local_position_sub.updated()) {
+			_vehicle_local_position_sub.copy(&_vehicle_local_position);
+		}
+
+		if (_pos_sp_triplet_sub.updated()) {
+			_pos_sp_triplet_sub.copy(&_pos_sp_triplet);
+		}
+
+		matrix::Vector2d global_pos(_global_pos.lat, _global_pos.lon);
+		matrix::Vector2d current_waypoint(_pos_sp_triplet.current.lat, _pos_sp_triplet.current.lon);
+		matrix::Vector2d next_waypoint(_pos_sp_triplet.next.lat, _pos_sp_triplet.next.lon);
+
+		const float vehicle_yaw = matrix::Eulerf(matrix::Quatf(_vehicle_attitude.q)).psi();
+		float body_angular_velocity = _vehicle_angular_velocity.xyz[2];
+
+		matrix::Vector3f ground_speed(_vehicle_local_position.vx, _vehicle_local_position.vy,  _vehicle_local_position.vz);
+		matrix::Vector2f ground_speed_2d(ground_speed);
+
+		// Velocity in body frame
+		const Dcmf R_to_body(Quatf(_vehicle_attitude.q).inversed());
+		const Vector3f velocity = R_to_body * Vector3f(ground_speed(0), ground_speed(1), ground_speed(2));
+		const float x_vel = velocity(0);
+
+		matrix::Vector2f guidance_output =
+			_differential_guidance_controller.computeGuidance(
+				global_pos,
+				current_waypoint,
+				next_waypoint,
+				vehicle_yaw,
+				x_vel,
+				body_angular_velocity,
+				dt
+			);
+
+		_differential_drive_setpoint.timestamp = now;
+		_differential_drive_setpoint.speed = guidance_output(0);
+		_differential_drive_setpoint.yaw_rate = guidance_output(1);
+		_differential_drive_setpoint_pub.publish(_differential_drive_setpoint);
+
 	}
 
 	_differential_drive_setpoint_sub.update(&_differential_drive_setpoint);
 
-	// publish data to actuator_motors (output module)
 	// get the wheel speeds from the inverse kinematics class (DifferentialDriveKinematics)
 	Vector2f wheel_speeds = _differential_drive_kinematics.computeInverseKinematics(
 					_differential_drive_setpoint.speed,
