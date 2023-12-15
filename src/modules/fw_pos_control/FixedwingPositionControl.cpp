@@ -155,6 +155,7 @@ FixedwingPositionControl::parameters_update()
 	_tecs.set_airspeed_filter_process_std_dev(_param_process_noise_standard_dev.get());
 
 	_performance_model.runSanityChecks();
+	checkThrottleParameterAdjusted();
 }
 
 void
@@ -2965,6 +2966,30 @@ void FixedwingPositionControl::navigateBearing(const matrix::Vector2f &vehicle_p
 	_target_bearing = atan2f(unit_path_tangent(1), unit_path_tangent(0));
 	_closest_point_on_path = vehicle_pos;
 	_npfg.guideToPath(vehicle_pos, ground_vel, wind_vel, unit_path_tangent, vehicle_pos, 0.0f);
+}
+
+void
+FixedwingPositionControl::checkThrottleParameterAdjusted()
+{
+	if (!_param_fw_t_chng_ack.get()) {
+		if (_param_fw_t_I_gain_thr.get() > 0.05f) {
+			/* EVENT
+			 * @description
+			 * Check if the throttle integrator gain is set to a high value that could lead to controller instability.
+			 */
+			events::send(events::ID("fixedwing_position_control_thr_integ_check"), events::Log::Critical,
+				     "High FW_T_I_GAIN_THR gain detected, reduce value or disable check via FW_T_CHNG_ACK");
+		}
+
+		if (_param_fw_t_thr_damp.get() > 0.1f) {
+			/* EVENT
+			 * @description
+			 * Check if the throttle damping gain is set to a high value that could lead to controller instability.
+			 */
+			events::send(events::ID("fixedwing_position_control_thr_damp_check"), events::Log::Critical,
+				     "High FW_T_THR_DAMP gain detected, reduce value or disable check via FW_T_CHNG_ACK");
+		}
+	}
 }
 
 int FixedwingPositionControl::task_spawn(int argc, char *argv[])

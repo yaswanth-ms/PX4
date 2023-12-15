@@ -976,3 +976,19 @@ PARAM_DEFINE_FLOAT(FW_SPOILERS_LND, 0.f);
  * @group FW Attitude Control
  */
 PARAM_DEFINE_FLOAT(FW_SPOILERS_DESC, 0.f);
+
+/**
+ * Acknowledge change of tuning
+ *
+ * Between PX4 v1.13 and v1.14, the tuning values for
+ * FW_T_I_GAIN_THR and FW_T_THR_DAMP have different effects,
+ * specifically much higher controller response if left unchanged.
+ * Their values thus should be adjusted (reduced) when upgrading.
+ * This parameter is used to acknowledge that the user has done so,
+ * and a warning is shown otherwise if either of the parameters has
+ * a value above its default.
+ *
+ * @boolean
+ * @group FW TECS
+ */
+PARAM_DEFINE_INT32(FW_T_CHNG_ACK, 0);

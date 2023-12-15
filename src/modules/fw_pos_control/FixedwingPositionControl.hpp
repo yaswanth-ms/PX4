@@ -880,6 +880,8 @@ private:
 				 const matrix::Vector2f &tangent_setpoint,
 				 const matrix::Vector2f &ground_vel, const matrix::Vector2f &wind_vel, const float &curvature);
 
+	void checkThrottleParameterAdjusted();
+
 	/*
 	 * Navigate on a fixed bearing.
 	 *
@@ -987,7 +989,8 @@ private:
 		(ParamFloat<px4::params::FW_TKO_AIRSPD>) _param_fw_tko_airspd,
 
 		(ParamFloat<px4::params::RWTO_PSP>) _param_rwto_psp,
-		(ParamBool<px4::params::FW_LAUN_DETCN_ON>) _param_fw_laun_detcn_on
+		(ParamBool<px4::params::FW_LAUN_DETCN_ON>) _param_fw_laun_detcn_on,
+		(ParamBool<px4::params::FW_T_CHNG_ACK>) _param_fw_t_chng_ack
 	)
 
 };
