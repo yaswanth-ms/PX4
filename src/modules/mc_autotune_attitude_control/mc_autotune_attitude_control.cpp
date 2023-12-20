@@ -247,7 +247,7 @@ void McAutotuneAttitudeControl::checkFilters()
 			_model_update_scaler = math::max(int(model_dt / _filter_dt), 1);
 			model_dt = _model_update_scaler * _filter_dt;
 
-			_sys_id.setForgettingFactor(60.f, model_dt);
+			_sys_id.setForgettingFactor(600.f, model_dt);
 			_sys_id.setFitnessLpfTimeConstant(1.f, model_dt);
 
 			_are_filters_initialized = true;
