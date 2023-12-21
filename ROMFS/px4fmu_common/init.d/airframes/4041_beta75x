@@ -17,13 +17,6 @@
 #
 
 . ${R}etc/init.d/rc.mc_defaults
-. ${R}etc/init.d/rc.quad_x_default_geometry
-
-# All propellers reverse turn direction to default
-param set-default CA_ROTOR0_KM -0.05
-param set-default CA_ROTOR1_KM -0.05
-param set-default CA_ROTOR2_KM 0.05
-param set-default CA_ROTOR3_KM 0.05
 
 param set-default CBRK_SUPPLY_CHK 894281
 
@@ -53,8 +46,20 @@ param set-default SYS_HAS_MAG 0
 
 param set-default BAT1_N_CELLS 2
 
+# Square quadrotor X with reverse turn direction
+param set-default CA_ROTOR_COUNT 4
+param set-default CA_ROTOR0_PX 1
+param set-default CA_ROTOR0_PY 1
+param set-default CA_ROTOR0_KM -0.05
+param set-default CA_ROTOR1_PX -1
+param set-default CA_ROTOR1_PY -1
+param set-default CA_ROTOR1_KM -0.05
+param set-default CA_ROTOR2_PX 1
+param set-default CA_ROTOR2_PY -1
+param set-default CA_ROTOR3_PX -1
+param set-default CA_ROTOR3_PY 1
+
 param set-default PWM_MAIN_FUNC1 104
 param set-default PWM_MAIN_FUNC2 101
 param set-default PWM_MAIN_FUNC3 102
 param set-default PWM_MAIN_FUNC4 103
-
