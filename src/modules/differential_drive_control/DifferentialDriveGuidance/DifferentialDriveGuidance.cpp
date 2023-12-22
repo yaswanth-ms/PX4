@@ -12,7 +12,7 @@ matrix::Vector2f DifferentialDriveGuidance::computeGuidance(const matrix::Vector
 		const matrix::Vector2d &current_waypoint, const matrix::Vector2d &next_waypoint,
 		float vehicle_yaw, float body_velocity, float angular_velocity, float dt)
 {
-	float distance_to_next_wp = get_distance_to_next_waypoint(global_pos(0), global_pos(1), current_waypoint(0),
+	const float distance_to_next_wp = get_distance_to_next_waypoint(global_pos(0), global_pos(1), current_waypoint(0),
 				    current_waypoint(1));
 
 	float desired_heading = get_bearing_to_next_waypoint(global_pos(0), global_pos(1), current_waypoint(0),
