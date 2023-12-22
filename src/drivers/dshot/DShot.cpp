@@ -144,7 +144,7 @@ void DShot::enable_dshot_outputs(const bool enabled)
 			}
 		}
 
-		int ret = up_dshot_init(_output_mask, dshot_frequency);
+		int ret = up_dshot_init(_output_mask, dshot_frequency, _param_bidirectional_enable.get());
 
 		if (ret < 0) {
 			PX4_ERR("up_dshot_init failed (%i)", ret);
@@ -607,6 +607,24 @@ void DShot::update_params()
 	}
 }
 
+void DShot::erpm(int32_t erpms[], size_t num_erpms)
+{
+	esc_status_s &esc_status = _esc_status_pub.get();
+	esc_status = {};
+	esc_status.timestamp = hrt_absolute_time();
+	esc_status.counter = _esc_status_counter++;
+	esc_status.esc_count = num_erpms;
+	esc_status.esc_connectiontype = esc_status_s::ESC_CONNECTION_TYPE_DSHOT;
+	esc_status.esc_armed_flags = _outputs_on;
+
+	for (unsigned i = 0; i < num_erpms && i < esc_status_s::CONNECTED_ESC_MAX; ++i) {
+		esc_status.esc[i].timestamp = hrt_absolute_time();
+		esc_status.esc[i].esc_rpm = erpms[i] / (_param_mot_pole_count.get() / 2);
+	}
+
+	_esc_status_pub.update();
+}
+
 int DShot::custom_command(int argc, char *argv[])
 {
 	const char *verb = argv[0];
@@ -712,6 +730,9 @@ int DShot::print_status()
 		PX4_INFO("telemetry on: %s", _telemetry_device);
 		_telemetry->handler.printStatus();
 	}
+
+	/* TODO cleanup Print bidirectiona dshot status */
+	up_bdshot_status();
 
 	return 0;
 }
