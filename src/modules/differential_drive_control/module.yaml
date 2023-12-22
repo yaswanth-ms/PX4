@@ -91,7 +91,7 @@ parameters:
         default: 1.0
       RDD_I_SPEED:
         description:
-          short: Integral gain for speed
+          short: Integral gain for ground speed
         type: float
         min: 0
         max: 100
